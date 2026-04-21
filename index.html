@@ -1,0 +1,1387 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>IR Ball Sensor Visualizer - RCJ Soccer Debug Tool</title>
+  <meta name="description" content="ロボカップジュニアサッカー用 IRボールセンサー リアルタイム可視化ツール">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    /* ===== Reset & Base ===== */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg-primary: #06060f;
+      --bg-secondary: #0d0d1f;
+      --bg-card: #111128;
+      --bg-card-hover: #16163a;
+      --border: #1e1e4a;
+      --border-glow: #2a2a6a;
+      --text-primary: #e8e8f0;
+      --text-secondary: #8888aa;
+      --text-muted: #555577;
+      --accent-green: #00ff88;
+      --accent-green-dim: #00cc6a;
+      --accent-blue: #4488ff;
+      --accent-red: #ff3366;
+      --accent-red-glow: rgba(255, 51, 102, 0.4);
+      --accent-orange: #ff8844;
+      --accent-purple: #aa66ff;
+      --radar-ring: rgba(0, 255, 136, 0.12);
+      --radar-ring-stroke: rgba(0, 255, 136, 0.25);
+      --radar-line: rgba(0, 255, 136, 0.08);
+      --font-ui: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      --font-mono: 'JetBrains Mono', 'Consolas', monospace;
+      --radius: 12px;
+      --radius-sm: 8px;
+      --transition: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    body {
+      font-family: var(--font-ui);
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      min-height: 100vh;
+      overflow-x: hidden;
+      background-image:
+        radial-gradient(ellipse at 20% 50%, rgba(0, 255, 136, 0.03) 0%, transparent 60%),
+        radial-gradient(ellipse at 80% 20%, rgba(68, 136, 255, 0.03) 0%, transparent 60%);
+    }
+
+    /* ===== Header ===== */
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 28px;
+      border-bottom: 1px solid var(--border);
+      background: rgba(6, 6, 15, 0.8);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+    .header-logo {
+      width: 38px;
+      height: 38px;
+      background: linear-gradient(135deg, var(--accent-green), var(--accent-blue));
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      box-shadow: 0 4px 20px rgba(0,255,136,0.15);
+    }
+    .header-title {
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+    .header-title span {
+      color: var(--accent-green);
+    }
+    .header-subtitle {
+      font-size: 11px;
+      color: var(--text-muted);
+      font-weight: 500;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .fps-badge {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--accent-green);
+      background: rgba(0,255,136,0.08);
+      border: 1px solid rgba(0,255,136,0.15);
+      padding: 5px 12px;
+      border-radius: 20px;
+    }
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--text-muted);
+      transition: background var(--transition);
+    }
+    .status-dot.connected {
+      background: var(--accent-green);
+      box-shadow: 0 0 8px var(--accent-green);
+      animation: pulse-dot 2s infinite;
+    }
+    .status-dot.mock {
+      background: var(--accent-orange);
+      box-shadow: 0 0 8px var(--accent-orange);
+      animation: pulse-dot 2s infinite;
+    }
+    @keyframes pulse-dot {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+    .status-text {
+      font-size: 12px;
+      color: var(--text-secondary);
+      font-weight: 500;
+    }
+
+    /* ===== Main Layout ===== */
+    .main-content {
+      display: grid;
+      grid-template-columns: 300px 1fr 300px;
+      gap: 0;
+      min-height: calc(100vh - 70px);
+    }
+    @media (max-width: 1100px) {
+      .main-content {
+        grid-template-columns: 1fr;
+        grid-template-rows: auto 1fr auto;
+      }
+    }
+
+    /* ===== Sidebar Panels ===== */
+    .sidebar {
+      padding: 20px;
+      border-right: 1px solid var(--border);
+      overflow-y: auto;
+      max-height: calc(100vh - 70px);
+    }
+    .sidebar.right {
+      border-right: none;
+      border-left: 1px solid var(--border);
+    }
+    @media (max-width: 1100px) {
+      .sidebar {
+        border-right: none;
+        border-bottom: 1px solid var(--border);
+        max-height: none;
+      }
+      .sidebar.right {
+        border-left: none;
+        border-top: 1px solid var(--border);
+      }
+    }
+
+    .panel {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 18px;
+      margin-bottom: 16px;
+      transition: border-color var(--transition);
+    }
+    .panel:hover {
+      border-color: var(--border-glow);
+    }
+    .panel-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 14px;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+    .panel-header-icon {
+      font-size: 14px;
+    }
+    .panel-header .collapse-btn {
+      margin-left: auto;
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 16px;
+      transition: transform var(--transition);
+      line-height: 1;
+    }
+    .panel-header .collapse-btn.collapsed {
+      transform: rotate(-90deg);
+    }
+    .panel-body.collapsed {
+      display: none;
+    }
+
+    /* ===== Form Controls ===== */
+    .form-group {
+      margin-bottom: 12px;
+    }
+    .form-group:last-child {
+      margin-bottom: 0;
+    }
+    .form-label {
+      display: block;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-muted);
+      margin-bottom: 5px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .form-input, .form-select {
+      width: 100%;
+      padding: 8px 12px;
+      font-family: var(--font-mono);
+      font-size: 13px;
+      color: var(--text-primary);
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      outline: none;
+      transition: border-color var(--transition), box-shadow var(--transition);
+    }
+    .form-input:focus, .form-select:focus {
+      border-color: var(--accent-green);
+      box-shadow: 0 0 0 3px rgba(0,255,136,0.08);
+    }
+    .form-select {
+      cursor: pointer;
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%238888aa' viewBox='0 0 16 16'%3E%3Cpath d='M8 11L3 6h10z'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 10px center;
+      padding-right: 30px;
+    }
+    .form-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+    .form-hint {
+      font-size: 10px;
+      color: var(--text-muted);
+      margin-top: 3px;
+    }
+
+    /* ===== Buttons ===== */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 10px 18px;
+      font-family: var(--font-ui);
+      font-size: 13px;
+      font-weight: 600;
+      border: 1px solid transparent;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      transition: all var(--transition);
+      white-space: nowrap;
+      width: 100%;
+    }
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent-green), var(--accent-green-dim));
+      color: #000;
+      border-color: var(--accent-green);
+    }
+    .btn-primary:hover {
+      box-shadow: 0 4px 20px rgba(0,255,136,0.25);
+      transform: translateY(-1px);
+    }
+    .btn-primary:active {
+      transform: translateY(0);
+    }
+    .btn-danger {
+      background: rgba(255,51,102,0.1);
+      color: var(--accent-red);
+      border-color: rgba(255,51,102,0.3);
+    }
+    .btn-danger:hover {
+      background: rgba(255,51,102,0.2);
+      box-shadow: 0 4px 20px rgba(255,51,102,0.15);
+    }
+    .btn-secondary {
+      background: var(--bg-secondary);
+      color: var(--text-secondary);
+      border-color: var(--border);
+    }
+    .btn-secondary:hover {
+      background: var(--bg-card-hover);
+      color: var(--text-primary);
+      border-color: var(--border-glow);
+    }
+    .btn-mock {
+      background: rgba(255,136,68,0.1);
+      color: var(--accent-orange);
+      border-color: rgba(255,136,68,0.3);
+    }
+    .btn-mock:hover {
+      background: rgba(255,136,68,0.2);
+      box-shadow: 0 4px 20px rgba(255,136,68,0.15);
+    }
+    .btn-group {
+      display: flex;
+      gap: 8px;
+    }
+    .btn-group .btn {
+      flex: 1;
+    }
+
+    /* ===== Radar Center ===== */
+    .radar-container {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      padding: 30px;
+    }
+    .radar-wrapper {
+      position: relative;
+      display: inline-block;
+    }
+    #radarCanvas {
+      display: block;
+      border-radius: 50%;
+      /* Subtle outer glow */
+      filter: drop-shadow(0 0 40px rgba(0,255,136,0.05));
+    }
+
+    /* Ball Not Detected Overlay */
+    .not-detected-overlay {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: rgba(6,6,15,0.75);
+      backdrop-filter: blur(8px);
+      border-radius: 50%;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.4s ease;
+    }
+    .not-detected-overlay.visible {
+      opacity: 1;
+    }
+    .not-detected-icon {
+      font-size: 56px;
+      margin-bottom: 12px;
+      animation: float 3s ease-in-out infinite;
+    }
+    @keyframes float {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-8px); }
+    }
+    .not-detected-text {
+      font-size: 22px;
+      font-weight: 800;
+      color: var(--accent-red);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      text-shadow: 0 0 20px var(--accent-red-glow);
+    }
+    .not-detected-sub {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 6px;
+    }
+
+    /* ===== Data Display Cards ===== */
+    .data-cards {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+    .data-card {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 14px;
+      text-align: center;
+      transition: border-color var(--transition);
+    }
+    .data-card:hover {
+      border-color: var(--border-glow);
+    }
+    .data-card-label {
+      font-size: 10px;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 6px;
+    }
+    .data-card-value {
+      font-family: var(--font-mono);
+      font-size: 26px;
+      font-weight: 700;
+      line-height: 1;
+    }
+    .data-card-unit {
+      font-size: 13px;
+      font-weight: 400;
+      color: var(--text-secondary);
+      margin-left: 2px;
+    }
+    .data-card.angle .data-card-value {
+      color: var(--accent-blue);
+    }
+    .data-card.intensity .data-card-value {
+      color: var(--accent-green);
+    }
+    .data-card.full-width {
+      grid-column: 1 / -1;
+    }
+    .data-card.status-card .data-card-value {
+      font-size: 16px;
+      color: var(--accent-red);
+    }
+    .data-card.status-card .data-card-value.ok {
+      color: var(--accent-green);
+    }
+
+    /* ===== Raw Data Log ===== */
+    .raw-log {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-muted);
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 10px;
+      max-height: 160px;
+      overflow-y: auto;
+      line-height: 1.6;
+      word-break: break-all;
+    }
+    .raw-log::-webkit-scrollbar {
+      width: 4px;
+    }
+    .raw-log::-webkit-scrollbar-thumb {
+      background: var(--border);
+      border-radius: 4px;
+    }
+    .log-line { color: var(--text-muted); }
+    .log-line.error { color: var(--accent-red); }
+    .log-line.warn { color: var(--accent-orange); }
+    .log-line.info { color: var(--accent-blue); }
+
+    /* ===== Trail History ===== */
+    .trail-toggle {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      color: var(--text-secondary);
+      cursor: pointer;
+      user-select: none;
+    }
+    .trail-toggle input[type="checkbox"] {
+      appearance: none;
+      width: 36px;
+      height: 20px;
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      position: relative;
+      cursor: pointer;
+      transition: background var(--transition), border-color var(--transition);
+    }
+    .trail-toggle input[type="checkbox"]::after {
+      content: '';
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      width: 14px;
+      height: 14px;
+      background: var(--text-muted);
+      border-radius: 50%;
+      transition: transform var(--transition), background var(--transition);
+    }
+    .trail-toggle input[type="checkbox"]:checked {
+      background: rgba(0,255,136,0.15);
+      border-color: var(--accent-green);
+    }
+    .trail-toggle input[type="checkbox"]:checked::after {
+      transform: translateX(16px);
+      background: var(--accent-green);
+    }
+
+    /* ===== Scrollbar global ===== */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 6px; }
+
+    /* ===== Responsive ===== */
+    @media (max-width: 1100px) {
+      .radar-container { padding: 20px; }
+    }
+
+    /* ===== Animations ===== */
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .panel { animation: fadeIn 0.4s ease both; }
+    .panel:nth-child(2) { animation-delay: 0.05s; }
+    .panel:nth-child(3) { animation-delay: 0.1s; }
+
+    /* Web Serial not supported banner */
+    .no-serial-banner {
+      display: none;
+      background: rgba(255,51,102,0.1);
+      border: 1px solid rgba(255,51,102,0.3);
+      border-radius: var(--radius-sm);
+      padding: 12px 16px;
+      margin-bottom: 16px;
+      font-size: 12px;
+      color: var(--accent-red);
+      line-height: 1.5;
+    }
+    .no-serial-banner.visible {
+      display: block;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ===== HEADER ===== -->
+  <header class="header">
+    <div class="header-left">
+      <div class="header-logo">⚽</div>
+      <div>
+        <div class="header-title">IR Ball <span>Visualizer</span></div>
+        <div class="header-subtitle">RoboCup Junior Soccer Debug Tool</div>
+      </div>
+    </div>
+    <div class="header-right">
+      <div class="fps-badge" id="fpsBadge">-- FPS</div>
+      <div class="status-dot" id="statusDot"></div>
+      <div class="status-text" id="statusText">未接続</div>
+    </div>
+  </header>
+
+  <!-- ===== MAIN ===== -->
+  <div class="main-content">
+
+    <!-- ===== LEFT SIDEBAR ===== -->
+    <div class="sidebar" id="leftSidebar">
+
+      <!-- Connection Panel -->
+      <div class="panel" id="connectionPanel">
+        <div class="panel-header">
+          <span class="panel-header-icon">🔌</span> 接続設定
+          <button class="collapse-btn" onclick="togglePanel(this)">▼</button>
+        </div>
+        <div class="panel-body">
+          <div id="noSerialBanner" class="no-serial-banner">
+            ⚠ このブラウザは Web Serial API に対応していません。<br>Chrome または Edge を使用してください。<br>モックモードは使用可能です。
+          </div>
+          <div class="form-group">
+            <label class="form-label">ボーレート</label>
+            <select class="form-select" id="baudRate">
+              <option value="9600">9600</option>
+              <option value="19200">19200</option>
+              <option value="38400">38400</option>
+              <option value="57600">57600</option>
+              <option value="115200" selected>115200</option>
+              <option value="230400">230400</option>
+              <option value="460800">460800</option>
+              <option value="921600">921600</option>
+            </select>
+          </div>
+          <div class="btn-group" style="margin-bottom:10px;">
+            <button class="btn btn-primary" id="btnConnect" onclick="connectSerial()">
+              🔗 接続
+            </button>
+            <button class="btn btn-danger" id="btnDisconnect" onclick="disconnectSerial()" style="display:none;">
+              ✕ 切断
+            </button>
+          </div>
+          <button class="btn btn-mock" id="btnMock" onclick="toggleMock()">
+            🧪 モック開始
+          </button>
+        </div>
+      </div>
+
+      <!-- Data Format Panel -->
+      <div class="panel" id="formatPanel">
+        <div class="panel-header">
+          <span class="panel-header-icon">📐</span> データ形式
+          <button class="collapse-btn" onclick="togglePanel(this)">▼</button>
+        </div>
+        <div class="panel-body">
+          <div class="form-group">
+            <label class="form-label">データ区切り文字</label>
+            <input class="form-input" id="cfgDelimiter" type="text" value="," placeholder=",">
+            <div class="form-hint">例: カンマ(,) タブ(\t) スペース( )</div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">角度フィールド番号</label>
+              <input class="form-input" id="cfgAngleIdx" type="number" value="0" min="0">
+              <div class="form-hint">0始まり</div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">強度フィールド番号</label>
+              <input class="form-input" id="cfgIntensityIdx" type="number" value="1" min="0">
+              <div class="form-hint">0始まり</div>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">未検知値 (角度)</label>
+              <input class="form-input" id="cfgNotDetected" type="text" value="404">
+            </div>
+            <div class="form-group">
+              <label class="form-label">強度最大値</label>
+              <input class="form-input" id="cfgMaxIntensity" type="number" value="300" min="1">
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">カスタムパースコード (上級者向け)</label>
+            <textarea class="form-input" id="cfgCustomParse" rows="4" placeholder="// line: 受信行 (string)&#10;// return: {angle: number, intensity: number} or null&#10;// 例:&#10;// const m = line.match(/A:(\d+) I:(\d+)/);&#10;// return m ? {angle:+m[1], intensity:+m[2]} : null;" style="font-size:11px;resize:vertical;"></textarea>
+            <div class="form-hint">空欄の場合はデフォルトのパーサーを使用</div>
+          </div>
+          <button class="btn btn-secondary" onclick="applyFormatConfig()" style="margin-top:6px;">
+            ✓ 適用
+          </button>
+        </div>
+      </div>
+
+      <!-- Display Settings -->
+      <div class="panel" id="displayPanel">
+        <div class="panel-header">
+          <span class="panel-header-icon">🎨</span> 表示設定
+          <button class="collapse-btn" onclick="togglePanel(this)">▼</button>
+        </div>
+        <div class="panel-body">
+          <div class="form-group">
+            <label class="trail-toggle">
+              <input type="checkbox" id="cfgTrail" checked>
+              軌跡表示
+            </label>
+          </div>
+          <div class="form-group">
+            <label class="form-label">軌跡の長さ</label>
+            <input class="form-input" id="cfgTrailLen" type="number" value="20" min="1" max="100">
+          </div>
+          <div class="form-group">
+            <label class="form-label">0°の方向</label>
+            <select class="form-select" id="cfgZeroDir">
+              <option value="up" selected>上 (前方)</option>
+              <option value="right">右</option>
+              <option value="down">下 (後方)</option>
+              <option value="left">左</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">角度の回転方向</label>
+            <select class="form-select" id="cfgRotation">
+              <option value="cw" selected>時計回り (CW)</option>
+              <option value="ccw">反時計回り (CCW)</option>
+            </select>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== RADAR CENTER ===== -->
+    <div class="radar-container" id="radarContainer">
+      <div class="radar-wrapper">
+        <canvas id="radarCanvas" width="520" height="520"></canvas>
+        <div class="not-detected-overlay" id="notDetectedOverlay">
+          <div class="not-detected-icon">🚫</div>
+          <div class="not-detected-text">Ball Not Detected</div>
+          <div class="not-detected-sub">IRセンサーがボールを検知していません</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== RIGHT SIDEBAR ===== -->
+    <div class="sidebar right" id="rightSidebar">
+
+      <!-- Live Data -->
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-header-icon">📊</span> ライブデータ
+        </div>
+        <div class="panel-body">
+          <div class="data-cards">
+            <div class="data-card angle">
+              <div class="data-card-label">角度</div>
+              <div class="data-card-value" id="dispAngle">--<span class="data-card-unit">°</span></div>
+            </div>
+            <div class="data-card intensity">
+              <div class="data-card-label">強度</div>
+              <div class="data-card-value" id="dispIntensity">--</div>
+            </div>
+            <div class="data-card full-width status-card">
+              <div class="data-card-label">検知ステータス</div>
+              <div class="data-card-value" id="dispStatus">--</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Stats -->
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-header-icon">📈</span> 統計
+        </div>
+        <div class="panel-body">
+          <div class="data-cards">
+            <div class="data-card">
+              <div class="data-card-label">受信数</div>
+              <div class="data-card-value" id="dispCount" style="font-size:20px;color:var(--accent-purple);">0</div>
+            </div>
+            <div class="data-card">
+              <div class="data-card-label">受信レート</div>
+              <div class="data-card-value" id="dispRate" style="font-size:20px;color:var(--accent-orange);">--<span class="data-card-unit">Hz</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Raw Log -->
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-header-icon">📋</span> 受信ログ
+          <button class="collapse-btn" onclick="togglePanel(this)">▼</button>
+        </div>
+        <div class="panel-body">
+          <div class="raw-log" id="rawLog"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== JAVASCRIPT ===== -->
+  <script>
+    // ============================================================
+    //  State
+    // ============================================================
+    let serialPort = null;
+    let serialReader = null;
+    let serialReadable = null;
+    let isConnected = false;
+    let isMocking = false;
+    let mockInterval = null;
+
+    let currentAngle = null;
+    let currentIntensity = null;
+    let ballDetected = false;
+
+    const trail = [];         // [{angle, intensity, t}, ...]
+    let receiveCount = 0;
+    let rateTimestamps = [];  // recent timestamps for Hz calc
+
+    // Format config (mutable)
+    let cfg = {
+      delimiter: ',',
+      angleIdx: 0,
+      intensityIdx: 1,
+      notDetectedValue: '404',
+      maxIntensity: 300,
+      trailEnabled: true,
+      trailLength: 20,
+      zeroDir: 'up',        // 'up','right','down','left'
+      rotation: 'cw',       // 'cw','ccw'
+      customParseFn: null,
+    };
+
+    // ============================================================
+    //  Format Config Apply
+    // ============================================================
+    function applyFormatConfig() {
+      const delim = document.getElementById('cfgDelimiter').value;
+      cfg.delimiter = delim === '\\t' ? '\t' : delim || ',';
+      cfg.angleIdx = parseInt(document.getElementById('cfgAngleIdx').value) || 0;
+      cfg.intensityIdx = parseInt(document.getElementById('cfgIntensityIdx').value) || 1;
+      cfg.notDetectedValue = document.getElementById('cfgNotDetected').value.trim() || '404';
+      cfg.maxIntensity = parseInt(document.getElementById('cfgMaxIntensity').value) || 300;
+
+      const customCode = document.getElementById('cfgCustomParse').value.trim();
+      if (customCode) {
+        try {
+          cfg.customParseFn = new Function('line', customCode);
+          addLog('カスタムパーサーを適用しました', 'info');
+        } catch (e) {
+          cfg.customParseFn = null;
+          addLog('カスタムパーサーのエラー: ' + e.message, 'error');
+        }
+      } else {
+        cfg.customParseFn = null;
+      }
+
+      addLog('データ形式設定を更新しました', 'info');
+    }
+
+    function readDisplayConfig() {
+      cfg.trailEnabled = document.getElementById('cfgTrail').checked;
+      cfg.trailLength = parseInt(document.getElementById('cfgTrailLen').value) || 20;
+      cfg.zeroDir = document.getElementById('cfgZeroDir').value;
+      cfg.rotation = document.getElementById('cfgRotation').value;
+    }
+
+    // Listen for display config changes
+    ['cfgTrail', 'cfgTrailLen', 'cfgZeroDir', 'cfgRotation'].forEach(id => {
+      document.getElementById(id).addEventListener('change', readDisplayConfig);
+      document.getElementById(id).addEventListener('input', readDisplayConfig);
+    });
+
+    // ============================================================
+    //  Parse incoming line
+    // ============================================================
+    function parseLine(line) {
+      line = line.trim();
+      if (!line) return null;
+
+      // Custom parser
+      if (cfg.customParseFn) {
+        try {
+          const result = cfg.customParseFn(line);
+          if (result && typeof result.angle === 'number' && typeof result.intensity === 'number') {
+            return result;
+          }
+        } catch (e) { /* fall through to default */ }
+        return null;
+      }
+
+      // Default parser
+      const parts = line.split(cfg.delimiter);
+      if (parts.length < Math.max(cfg.angleIdx, cfg.intensityIdx) + 1) return null;
+
+      const angleStr = parts[cfg.angleIdx].trim();
+      const intensityStr = parts[cfg.intensityIdx].trim();
+
+      const angle = parseFloat(angleStr);
+      const intensity = parseFloat(intensityStr);
+
+      if (isNaN(angle) || isNaN(intensity)) return null;
+      return { angle, intensity };
+    }
+
+    // ============================================================
+    //  Data Handler
+    // ============================================================
+    function handleData(line) {
+      const parsed = parseLine(line);
+      if (!parsed) {
+        addLog(line, 'warn');
+        return;
+      }
+
+      receiveCount++;
+      rateTimestamps.push(performance.now());
+
+      const { angle, intensity } = parsed;
+      const notDetVal = parseFloat(cfg.notDetectedValue);
+      const isNotDet = (angle === notDetVal) || (String(angle) === cfg.notDetectedValue);
+
+      if (isNotDet) {
+        ballDetected = false;
+        currentAngle = null;
+        currentIntensity = null;
+      } else {
+        ballDetected = true;
+        currentAngle = angle;
+        currentIntensity = intensity;
+
+        if (cfg.trailEnabled) {
+          trail.push({ angle, intensity, t: performance.now() });
+          while (trail.length > cfg.trailLength) trail.shift();
+        }
+      }
+
+      // Update text displays
+      updateTextDisplays(angle, intensity, isNotDet);
+      addLog(line, isNotDet ? 'warn' : '');
+    }
+
+    function updateTextDisplays(angle, intensity, notDet) {
+      const el = (id) => document.getElementById(id);
+
+      if (notDet) {
+        el('dispAngle').innerHTML = '<span style="font-size:16px">N/A</span>';
+        el('dispIntensity').textContent = '--';
+        el('dispStatus').textContent = '未検知';
+        el('dispStatus').className = 'data-card-value';
+      } else {
+        el('dispAngle').innerHTML = angle.toFixed(1) + '<span class="data-card-unit">°</span>';
+        el('dispIntensity').textContent = Math.round(intensity);
+        el('dispStatus').textContent = '検知中';
+        el('dispStatus').className = 'data-card-value ok';
+      }
+
+      el('dispCount').textContent = receiveCount;
+
+      // Hz calculation (last 1 second)
+      const now = performance.now();
+      rateTimestamps = rateTimestamps.filter(t => now - t < 1000);
+      el('dispRate').innerHTML = rateTimestamps.length + '<span class="data-card-unit">Hz</span>';
+    }
+
+    // ============================================================
+    //  Log
+    // ============================================================
+    const logEl = document.getElementById('rawLog');
+    const MAX_LOG_LINES = 80;
+    let logLines = 0;
+
+    function addLog(text, type = '') {
+      const line = document.createElement('div');
+      line.className = 'log-line' + (type ? ' ' + type : '');
+      const ts = new Date().toLocaleTimeString('ja-JP', { hour12: false });
+      line.textContent = `[${ts}] ${text}`;
+      logEl.appendChild(line);
+      logLines++;
+      if (logLines > MAX_LOG_LINES) {
+        logEl.removeChild(logEl.firstChild);
+        logLines--;
+      }
+      logEl.scrollTop = logEl.scrollHeight;
+    }
+
+    // ============================================================
+    //  Panel toggle
+    // ============================================================
+    function togglePanel(btn) {
+      btn.classList.toggle('collapsed');
+      btn.closest('.panel').querySelector('.panel-body').classList.toggle('collapsed');
+    }
+
+    // ============================================================
+    //  Serial Connection
+    // ============================================================
+    async function connectSerial() {
+      if (!('serial' in navigator)) {
+        addLog('Web Serial API 非対応ブラウザです', 'error');
+        return;
+      }
+      try {
+        serialPort = await navigator.serial.requestPort();
+        const baud = parseInt(document.getElementById('baudRate').value);
+        await serialPort.open({ baudRate: baud });
+        isConnected = true;
+        updateConnectionUI();
+        addLog(`シリアルポート接続 (${baud} bps)`, 'info');
+        readSerial();
+      } catch (e) {
+        addLog('接続エラー: ' + e.message, 'error');
+      }
+    }
+
+    async function readSerial() {
+      const decoder = new TextDecoderStream();
+      serialReadable = serialPort.readable.pipeTo(decoder.writable);
+      const reader = decoder.readable.getReader();
+      serialReader = reader;
+
+      let buffer = '';
+      try {
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          buffer += value;
+          const lines = buffer.split('\n');
+          buffer = lines.pop(); // keep incomplete last line in buffer
+          for (const line of lines) {
+            if (line.trim()) handleData(line);
+          }
+        }
+      } catch (e) {
+        if (isConnected) addLog('読み取りエラー: ' + e.message, 'error');
+      } finally {
+        reader.releaseLock();
+      }
+    }
+
+    async function disconnectSerial() {
+      isConnected = false;
+      try {
+        if (serialReader) { await serialReader.cancel(); serialReader = null; }
+        if (serialReadable) { await serialReadable.catch(() => {}); serialReadable = null; }
+        if (serialPort) { await serialPort.close(); serialPort = null; }
+      } catch (e) { /* ignore */ }
+      updateConnectionUI();
+      addLog('シリアルポート切断', 'info');
+    }
+
+    function updateConnectionUI() {
+      const dot = document.getElementById('statusDot');
+      const txt = document.getElementById('statusText');
+      const btnC = document.getElementById('btnConnect');
+      const btnD = document.getElementById('btnDisconnect');
+
+      if (isConnected) {
+        dot.className = 'status-dot connected';
+        txt.textContent = '接続中';
+        btnC.style.display = 'none';
+        btnD.style.display = '';
+      } else if (isMocking) {
+        dot.className = 'status-dot mock';
+        txt.textContent = 'モック動作中';
+        btnC.style.display = '';
+        btnD.style.display = 'none';
+      } else {
+        dot.className = 'status-dot';
+        txt.textContent = '未接続';
+        btnC.style.display = '';
+        btnD.style.display = 'none';
+      }
+    }
+
+    // ============================================================
+    //  Mock Data Generator
+    // ============================================================
+    let mockAngle = 0;
+    let mockMode = 'orbit'; // 'orbit', 'random', 'notdetected'
+    let mockModeTick = 0;
+
+    function toggleMock() {
+      if (isMocking) {
+        stopMock();
+      } else {
+        startMock();
+      }
+    }
+
+    function startMock() {
+      if (isConnected) {
+        addLog('シリアル接続中はモックを使用できません', 'warn');
+        return;
+      }
+      isMocking = true;
+      mockAngle = 0;
+      mockModeTick = 0;
+      document.getElementById('btnMock').textContent = '⏹ モック停止';
+      document.getElementById('btnMock').classList.remove('btn-mock');
+      document.getElementById('btnMock').classList.add('btn-danger');
+      updateConnectionUI();
+      addLog('モックデータ生成を開始', 'info');
+
+      mockInterval = setInterval(() => {
+        mockModeTick++;
+
+        // Switch modes periodically
+        if (mockModeTick % 200 === 0) {
+          const modes = ['orbit', 'random', 'notdetected', 'orbit'];
+          mockMode = modes[Math.floor(Math.random() * modes.length)];
+        }
+
+        let line;
+        if (mockMode === 'notdetected' && mockModeTick % 5 < 3) {
+          line = `404${cfg.delimiter}0`;
+        } else if (mockMode === 'orbit') {
+          mockAngle = (mockAngle + 3 + Math.random() * 2) % 360;
+          const intensity = 120 + Math.sin(mockAngle * Math.PI / 180) * 80 + Math.random() * 30;
+          line = `${mockAngle.toFixed(1)}${cfg.delimiter}${Math.round(intensity)}`;
+        } else {
+          // Random
+          const a = Math.random() * 360;
+          const i = 50 + Math.random() * 250;
+          line = `${a.toFixed(1)}${cfg.delimiter}${Math.round(i)}`;
+
+          // 10% chance not detected
+          if (Math.random() < 0.1) {
+            line = `404${cfg.delimiter}0`;
+          }
+        }
+
+        handleData(line);
+      }, 40); // 25 Hz
+    }
+
+    function stopMock() {
+      isMocking = false;
+      clearInterval(mockInterval);
+      mockInterval = null;
+      document.getElementById('btnMock').textContent = '🧪 モック開始';
+      document.getElementById('btnMock').classList.add('btn-mock');
+      document.getElementById('btnMock').classList.remove('btn-danger');
+      updateConnectionUI();
+      addLog('モックデータ生成を停止', 'info');
+    }
+
+    // ============================================================
+    //  Canvas Radar Drawing
+    // ============================================================
+    const canvas = document.getElementById('radarCanvas');
+    const ctx = canvas.getContext('2d');
+    const CW = canvas.width;
+    const CH = canvas.height;
+    const CX = CW / 2;
+    const CY = CH / 2;
+    const RADAR_R = 230; // radar radius in pixels
+
+    let frameCount = 0;
+    let lastFpsTime = performance.now();
+    let fps = 0;
+    let animTime = 0;
+
+    function angleToCanvas(angleDeg) {
+      // Convert angle to canvas coordinate angle (radians)
+      // 0° = zeroDir, positive = rotation direction
+      let rad = angleDeg * Math.PI / 180;
+
+      // Apply rotation direction
+      if (cfg.rotation === 'ccw') rad = -rad;
+
+      // Apply zero direction offset
+      const offsets = { up: -Math.PI / 2, right: 0, down: Math.PI / 2, left: Math.PI };
+      rad += offsets[cfg.zeroDir] || -Math.PI / 2;
+
+      return rad;
+    }
+
+    function intensityToRadius(intensity) {
+      return Math.min(Math.max(intensity / cfg.maxIntensity, 0), 1) * RADAR_R;
+    }
+
+    function drawRadar(timestamp) {
+      animTime = timestamp || 0;
+      ctx.clearRect(0, 0, CW, CH);
+
+      // Background circle
+      const bgGrad = ctx.createRadialGradient(CX, CY, 0, CX, CY, RADAR_R + 20);
+      bgGrad.addColorStop(0, 'rgba(10, 10, 30, 0.9)');
+      bgGrad.addColorStop(0.8, 'rgba(6, 8, 20, 0.95)');
+      bgGrad.addColorStop(1, 'rgba(6, 6, 15, 1)');
+      ctx.fillStyle = bgGrad;
+      ctx.beginPath();
+      ctx.arc(CX, CY, RADAR_R + 20, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Concentric rings
+      const rings = 5;
+      for (let i = 1; i <= rings; i++) {
+        const r = (RADAR_R / rings) * i;
+        ctx.beginPath();
+        ctx.arc(CX, CY, r, 0, Math.PI * 2);
+        ctx.strokeStyle = i === rings ? 'rgba(0, 255, 136, 0.3)' : 'var(--radar-ring-stroke)';
+        ctx.lineWidth = i === rings ? 1.5 : 0.5;
+        ctx.stroke();
+
+        // Ring value labels
+        const val = Math.round((cfg.maxIntensity / rings) * i);
+        ctx.fillStyle = 'rgba(136, 136, 170, 0.4)';
+        ctx.font = '10px Inter, sans-serif';
+        ctx.textAlign = 'left';
+        ctx.fillText(val, CX + 4, CY - r + 12);
+      }
+
+      // Fill rings with subtle gradient
+      for (let i = 1; i <= rings; i++) {
+        const r = (RADAR_R / rings) * i;
+        ctx.beginPath();
+        ctx.arc(CX, CY, r, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(0, 255, 136, ${0.01 + (i % 2 === 0 ? 0.01 : 0)})`;
+        ctx.fill();
+      }
+
+      // Angle guide lines
+      for (let deg = 0; deg < 360; deg += 30) {
+        const rad = angleToCanvas(deg);
+        const x2 = CX + Math.cos(rad) * RADAR_R;
+        const y2 = CY + Math.sin(rad) * RADAR_R;
+        ctx.beginPath();
+        ctx.moveTo(CX, CY);
+        ctx.lineTo(x2, y2);
+        ctx.strokeStyle = deg % 90 === 0 ? 'rgba(0, 255, 136, 0.15)' : 'rgba(0, 255, 136, 0.06)';
+        ctx.lineWidth = deg % 90 === 0 ? 1 : 0.5;
+        ctx.stroke();
+
+        // Degree labels
+        const labelR = RADAR_R + 14;
+        const lx = CX + Math.cos(rad) * labelR;
+        const ly = CY + Math.sin(rad) * labelR;
+        ctx.fillStyle = deg % 90 === 0 ? 'rgba(136, 136, 170, 0.7)' : 'rgba(136, 136, 170, 0.35)';
+        ctx.font = deg % 90 === 0 ? 'bold 11px Inter, sans-serif' : '9px Inter, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(deg + '°', lx, ly);
+      }
+
+      // Center robot marker
+      ctx.beginPath();
+      ctx.arc(CX, CY, 6, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(0, 255, 136, 0.8)';
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(CX, CY, 10, 0, Math.PI * 2);
+      ctx.strokeStyle = 'rgba(0, 255, 136, 0.3)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+
+      // Forward direction indicator
+      const fwdRad = angleToCanvas(0);
+      const fwdX = CX + Math.cos(fwdRad) * 22;
+      const fwdY = CY + Math.sin(fwdRad) * 22;
+      ctx.beginPath();
+      ctx.moveTo(fwdX, fwdY);
+      const fwdLeft = fwdRad + Math.PI * 0.8;
+      const fwdRight = fwdRad - Math.PI * 0.8;
+      ctx.lineTo(CX + Math.cos(fwdLeft) * 12, CY + Math.sin(fwdLeft) * 12);
+      ctx.lineTo(CX + Math.cos(fwdRight) * 12, CY + Math.sin(fwdRight) * 12);
+      ctx.closePath();
+      ctx.fillStyle = 'rgba(0, 255, 136, 0.5)';
+      ctx.fill();
+
+      // Scanning sweep effect
+      if (isConnected || isMocking) {
+        const sweepAngle = (animTime / 2000) * Math.PI * 2;
+        const sweepGrad = ctx.createConicGradient(sweepAngle - Math.PI / 6, CX, CY);
+        sweepGrad.addColorStop(0, 'rgba(0, 255, 136, 0)');
+        sweepGrad.addColorStop(0.08, 'rgba(0, 255, 136, 0.04)');
+        sweepGrad.addColorStop(0.1, 'rgba(0, 255, 136, 0)');
+        sweepGrad.addColorStop(1, 'rgba(0, 255, 136, 0)');
+        ctx.beginPath();
+        ctx.arc(CX, CY, RADAR_R, 0, Math.PI * 2);
+        ctx.fillStyle = sweepGrad;
+        ctx.fill();
+      }
+
+      // Draw trail
+      if (cfg.trailEnabled && trail.length > 0) {
+        for (let i = 0; i < trail.length; i++) {
+          const t = trail[i];
+          const alpha = ((i + 1) / trail.length) * 0.5;
+          const rad = angleToCanvas(t.angle);
+          const dist = intensityToRadius(t.intensity);
+          const tx = CX + Math.cos(rad) * dist;
+          const ty = CY + Math.sin(rad) * dist;
+
+          ctx.beginPath();
+          ctx.arc(tx, ty, 3, 0, Math.PI * 2);
+          ctx.fillStyle = `rgba(255, 51, 102, ${alpha * 0.6})`;
+          ctx.fill();
+        }
+
+        // Trail connecting lines
+        if (trail.length > 1) {
+          ctx.beginPath();
+          for (let i = 0; i < trail.length; i++) {
+            const t = trail[i];
+            const rad = angleToCanvas(t.angle);
+            const dist = intensityToRadius(t.intensity);
+            const tx = CX + Math.cos(rad) * dist;
+            const ty = CY + Math.sin(rad) * dist;
+            if (i === 0) ctx.moveTo(tx, ty);
+            else ctx.lineTo(tx, ty);
+          }
+          ctx.strokeStyle = 'rgba(255, 51, 102, 0.15)';
+          ctx.lineWidth = 1;
+          ctx.stroke();
+        }
+      }
+
+      // Draw ball marker
+      if (ballDetected && currentAngle !== null) {
+        const rad = angleToCanvas(currentAngle);
+        const dist = intensityToRadius(currentIntensity);
+        const bx = CX + Math.cos(rad) * dist;
+        const by = CY + Math.sin(rad) * dist;
+
+        // Glow
+        const glowSize = 30 + Math.sin(animTime / 300) * 8;
+        const glow = ctx.createRadialGradient(bx, by, 0, bx, by, glowSize);
+        glow.addColorStop(0, 'rgba(255, 51, 102, 0.4)');
+        glow.addColorStop(0.5, 'rgba(255, 51, 102, 0.1)');
+        glow.addColorStop(1, 'rgba(255, 51, 102, 0)');
+        ctx.fillStyle = glow;
+        ctx.beginPath();
+        ctx.arc(bx, by, glowSize, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Pulse ring
+        const pulseR = 14 + Math.sin(animTime / 200) * 4;
+        ctx.beginPath();
+        ctx.arc(bx, by, pulseR, 0, Math.PI * 2);
+        ctx.strokeStyle = `rgba(255, 51, 102, ${0.3 + Math.sin(animTime / 200) * 0.15})`;
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+
+        // Core dot
+        ctx.beginPath();
+        ctx.arc(bx, by, 7, 0, Math.PI * 2);
+        ctx.fillStyle = '#ff3366';
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(bx, by, 4, 0, Math.PI * 2);
+        ctx.fillStyle = '#ff6699';
+        ctx.fill();
+
+        // Direction line from center
+        ctx.beginPath();
+        ctx.moveTo(CX, CY);
+        ctx.lineTo(bx, by);
+        ctx.strokeStyle = 'rgba(255, 51, 102, 0.2)';
+        ctx.lineWidth = 1;
+        ctx.setLineDash([4, 4]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        // Angle & distance label near ball
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+        ctx.font = '500 11px Inter, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(`${currentAngle.toFixed(1)}° / ${Math.round(currentIntensity)}`, bx, by - 20);
+      }
+
+      // Not-detected overlay
+      document.getElementById('notDetectedOverlay').classList.toggle('visible', !ballDetected && (isConnected || isMocking));
+
+      // FPS counter
+      frameCount++;
+      const now = performance.now();
+      if (now - lastFpsTime >= 500) {
+        fps = Math.round(frameCount / ((now - lastFpsTime) / 1000));
+        frameCount = 0;
+        lastFpsTime = now;
+        document.getElementById('fpsBadge').textContent = fps + ' FPS';
+      }
+
+      requestAnimationFrame(drawRadar);
+    }
+
+    // ============================================================
+    //  Responsive canvas sizing
+    // ============================================================
+    function resizeCanvas() {
+      const container = document.getElementById('radarContainer');
+      const size = Math.min(container.clientWidth - 60, container.clientHeight - 60, 520);
+      if (size > 0 && size !== canvas.width) {
+        // Keep the canvas at 520 internal resolution for crispness
+        canvas.style.width = size + 'px';
+        canvas.style.height = size + 'px';
+      }
+    }
+    window.addEventListener('resize', resizeCanvas);
+    setTimeout(resizeCanvas, 100);
+
+    // ============================================================
+    //  Init
+    // ============================================================
+    function init() {
+      // Check Web Serial support
+      if (!('serial' in navigator)) {
+        document.getElementById('noSerialBanner').classList.add('visible');
+      }
+
+      // Start render loop
+      requestAnimationFrame(drawRadar);
+      addLog('IR Ball Sensor Visualizer を起動しました', 'info');
+      addLog('シリアル接続 または モックモード で開始してください', 'info');
+    }
+
+    init();
+  </script>
+</body>
+</html>
