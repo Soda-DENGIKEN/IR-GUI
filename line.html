@@ -81,6 +81,10 @@
             <div class="form-hint" style="margin-top:4px;color:var(--accent-blue)">ビット順: 前→右→後→左 (有効なアームのみ)</div>
           </div>
         </div>
+        <div class="form-group" style="border-top:1px solid var(--border);padding-top:12px">
+          <label class="form-label">カスタムパースコード (上級者向け)</label>
+          <textarea class="form-input" id="cfgCustomParse" rows="4" placeholder="// line: 受信行 (string)&#10;// return: {detected, dir, esc, chg, dist, bits, subBits} or null&#10;// 空欄の場合はデフォルト処理を使用" style="font-size:11px;resize:vertical;font-family:monospace;"></textarea>
+        </div>
         <button class="btn btn-secondary" onclick="applyConfig()" style="margin-top:6px">✓ 適用</button>
       </div>
     </div>
@@ -129,6 +133,7 @@ let serialPort=null,serialReader=null,serialReadable=null,isConnected=false,isMo
 let lineDetected=false,lineDir=0,escapeDir=0,angleChange=0,distance=0,sensorBits=0,subSensorBits=0;
 let receiveCount=0,rateTimestamps=[];
 let cfg={delimiter:',',sensorCount:16,detIdx:0,dirIdx:1,escIdx:2,chgIdx:3,distIdx:4,bitsIdx:5,subEnabled:true,subArms:{f:true,r:true,b:true,l:true},subPerArm:3,subBitsIdx:6};
+let customParseFunc=null;
 
 function applyConfig(){
   const d=document.getElementById('cfgDelimiter').value;
@@ -145,12 +150,16 @@ function applyConfig(){
   cfg.subPerArm=parseInt(document.getElementById('cfgSubPerArm').value)||3;
   cfg.subBitsIdx=parseInt(document.getElementById('cfgSubBitsIdx').value)||0;
   document.getElementById('subSettings').style.display=cfg.subEnabled?'':'none';
+  const customStr=document.getElementById('cfgCustomParse').value.trim();
+  if(customStr){try{customParseFunc=new Function('line','cfg',customStr);}catch(e){addLog('カスタムパース構文エラー','error');customParseFunc=null;}}
+  else{customParseFunc=null;}
   addLog('設定を適用しました','info');
 }
 
 function parseHexOrDec(s){s=(s||'0').trim();if(s.startsWith('0x')||s.startsWith('0X'))return parseInt(s,16)||0;return parseInt(s)||0;}
 function parseLine(raw){
   raw=raw.trim();if(!raw)return null;
+  if(customParseFunc){try{return customParseFunc(raw,cfg);}catch(e){return null;}}
   const p=raw.split(cfg.delimiter);
   const g=i=>{const v=p[i];if(v===undefined)return 0;const n=parseFloat(v.trim());return isNaN(n)?0:n;};
   const bv=parseHexOrDec(p[cfg.bitsIdx]);
