@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Line Sensor Visualizer - RCJ Soccer Debug Tool</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header class="header">
+  <div class="header-left">
+    <div class="header-logo">🤖</div>
+    <div>
+      <div class="header-title">Sensor <span>Visualizer</span></div>
+      <div class="header-subtitle">RoboCup Junior Soccer Debug Tool</div>
+    </div>
+    <nav class="nav-tabs">
+      <a href="index.html" class="nav-tab">⚽ IR Ball</a>
+      <a href="line.html" class="nav-tab active">📏 Line Sensor</a>
+    </nav>
+  </div>
+  <div class="header-right">
+    <div class="fps-badge" id="fpsBadge">-- FPS</div>
+    <div class="status-dot" id="statusDot"></div>
+    <div class="status-text" id="statusText">未接続</div>
+  </div>
+</header>
+<div class="main-content">
+  <div class="sidebar" id="leftSidebar">
+    <div class="panel">
+      <div class="panel-header">🔌 接続設定<button class="collapse-btn" onclick="togglePanel(this)">▼</button></div>
+      <div class="panel-body">
+        <div id="noSerialBanner" class="no-serial-banner">⚠ Web Serial API 非対応。Chrome/Edgeを使用してください。</div>
+        <div class="form-group"><label class="form-label">ボーレート</label>
+          <select class="form-select" id="baudRate"><option value="9600">9600</option><option value="115200" selected>115200</option><option value="230400">230400</option><option value="921600">921600</option></select>
+        </div>
+        <div class="btn-group" style="margin-bottom:10px">
+          <button class="btn btn-primary" id="btnConnect" onclick="connectSerial()">🔗 接続</button>
+          <button class="btn btn-danger" id="btnDisconnect" onclick="disconnectSerial()" style="display:none">✕ 切断</button>
+        </div>
+        <button class="btn btn-mock" id="btnMock" onclick="toggleMock()">🧪 モック開始</button>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-header">📐 データ形式<button class="collapse-btn" onclick="togglePanel(this)">▼</button></div>
+      <div class="panel-body">
+        <div class="form-group"><label class="form-label">区切り文字</label><input class="form-input" id="cfgDelimiter" value=","></div>
+        <div class="form-group"><label class="form-label">センサー個数</label>
+          <select class="form-select" id="cfgSensorCount"><option value="8">8</option><option value="12">12</option><option value="16" selected>16</option><option value="20">20</option><option value="24">24</option><option value="32">32</option></select>
+        </div>
+        <div class="form-group"><label class="form-label">データ内容の並び順</label>
+          <div class="form-hint" style="margin-bottom:8px">各フィールドの番号（0始まり）を指定</div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label class="form-label">ライン有無</label><input class="form-input" id="cfgDetIdx" type="number" value="0" min="0"><div class="form-hint">1=あり 0=なし</div></div>
+          <div class="form-group"><label class="form-label">ライン方向</label><input class="form-input" id="cfgDirIdx" type="number" value="1" min="0"><div class="form-hint">角度(度)</div></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label class="form-label">逃げる方向</label><input class="form-input" id="cfgEscIdx" type="number" value="2" min="0"></div>
+          <div class="form-group"><label class="form-label">角度変化量</label><input class="form-input" id="cfgChgIdx" type="number" value="3" min="0"></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label class="form-label">距離</label><input class="form-input" id="cfgDistIdx" type="number" value="4" min="0"></div>
+          <div class="form-group"><label class="form-label">センサービット</label><input class="form-input" id="cfgBitsIdx" type="number" value="5" min="0"><div class="form-hint">16進数 or 10進数</div></div>
+        </div>
+        <button class="btn btn-secondary" onclick="applyConfig()" style="margin-top:6px">✓ 適用</button>
+      </div>
+    </div>
+  </div>
+  <div class="radar-container" id="radarContainer">
+    <div class="radar-wrapper">
+      <canvas id="lineCanvas" width="520" height="520"></canvas>
+      <div class="not-detected-overlay" id="noLineOverlay">
+        <div class="not-detected-icon">⬜</div>
+        <div class="not-detected-text">No Line Detected</div>
+        <div class="not-detected-sub">ラインセンサーがラインを検知していません</div>
+      </div>
+    </div>
+  </div>
+  <div class="sidebar right">
+    <div class="panel">
+      <div class="panel-header">📊 ライブデータ</div>
+      <div class="panel-body">
+        <div class="data-cards">
+          <div class="data-card full-width"><div class="data-card-label">ライン有無</div><div class="data-card-value" id="dLineDetected" style="font-size:20px;color:var(--accent-orange)">--</div></div>
+          <div class="data-card"><div class="data-card-label">ラインの方向</div><div class="data-card-value" id="dLineDir" style="color:var(--accent-orange)">--<span class="data-card-unit">°</span></div></div>
+          <div class="data-card"><div class="data-card-label">逃げる方向</div><div class="data-card-value" id="dEscDir" style="color:var(--accent-green)">--<span class="data-card-unit">°</span></div></div>
+          <div class="data-card"><div class="data-card-label">角度変化量</div><div class="data-card-value" id="dAngleChg" style="font-size:20px;color:var(--accent-blue)">--<span class="data-card-unit">°</span></div></div>
+          <div class="data-card"><div class="data-card-label">距離</div><div class="data-card-value" id="dDist" style="font-size:20px;color:var(--accent-purple)">--</div></div>
+        </div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-header">📈 統計</div>
+      <div class="panel-body">
+        <div class="data-cards">
+          <div class="data-card"><div class="data-card-label">受信数</div><div class="data-card-value" id="dispCount" style="font-size:20px;color:var(--accent-purple)">0</div></div>
+          <div class="data-card"><div class="data-card-label">受信レート</div><div class="data-card-value" id="dispRate" style="font-size:20px;color:var(--accent-orange)">--<span class="data-card-unit">Hz</span></div></div>
+        </div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-header">📋 受信ログ<button class="collapse-btn" onclick="togglePanel(this)">▼</button></div>
+      <div class="panel-body"><div class="raw-log" id="rawLog"></div></div>
+    </div>
+  </div>
+</div>
+<script>
+// === State ===
+let serialPort=null,serialReader=null,serialReadable=null,isConnected=false,isMocking=false,mockInterval=null;
+let lineDetected=false,lineDir=0,escapeDir=0,angleChange=0,distance=0,sensorBits=0;
+let receiveCount=0,rateTimestamps=[];
+let cfg={delimiter:',',sensorCount:16,detIdx:0,dirIdx:1,escIdx:2,chgIdx:3,distIdx:4,bitsIdx:5};
+
+function applyConfig(){
+  const d=document.getElementById('cfgDelimiter').value;
+  cfg.delimiter=d==='\\t'?'\t':d||',';
+  cfg.sensorCount=parseInt(document.getElementById('cfgSensorCount').value)||16;
+  cfg.detIdx=parseInt(document.getElementById('cfgDetIdx').value)||0;
+  cfg.dirIdx=parseInt(document.getElementById('cfgDirIdx').value)||0;
+  cfg.escIdx=parseInt(document.getElementById('cfgEscIdx').value)||0;
+  cfg.chgIdx=parseInt(document.getElementById('cfgChgIdx').value)||0;
+  cfg.distIdx=parseInt(document.getElementById('cfgDistIdx').value)||0;
+  cfg.bitsIdx=parseInt(document.getElementById('cfgBitsIdx').value)||0;
+  addLog('設定を適用しました','info');
+}
+
+function parseLine(raw){
+  raw=raw.trim();if(!raw)return null;
+  const p=raw.split(cfg.delimiter);
+  const g=i=>{const v=p[i];if(v===undefined)return 0;const n=parseFloat(v.trim());return isNaN(n)?0:n;};
+  const bits=p[cfg.bitsIdx]?p[cfg.bitsIdx].trim():'0';
+  let bv=0;
+  if(bits.startsWith('0x')||bits.startsWith('0X'))bv=parseInt(bits,16);
+  else bv=parseInt(bits)||0;
+  return{detected:g(cfg.detIdx)>=1,dir:g(cfg.dirIdx),esc:g(cfg.escIdx),chg:g(cfg.chgIdx),dist:g(cfg.distIdx),bits:bv};
+}
+
+function handleData(raw){
+  const d=parseLine(raw);if(!d){addLog(raw,'warn');return;}
+  receiveCount++;rateTimestamps.push(performance.now());
+  lineDetected=d.detected;lineDir=d.dir;escapeDir=d.esc;angleChange=d.chg;distance=d.dist;sensorBits=d.bits;
+  const el=id=>document.getElementById(id);
+  el('dLineDetected').textContent=lineDetected?'あり':'なし';
+  el('dLineDetected').style.color=lineDetected?'var(--accent-orange)':'var(--accent-green)';
+  el('dLineDir').innerHTML=lineDir.toFixed(0)+'<span class="data-card-unit">°</span>';
+  el('dEscDir').innerHTML=escapeDir.toFixed(0)+'<span class="data-card-unit">°</span>';
+  el('dAngleChg').innerHTML=angleChange.toFixed(0)+'<span class="data-card-unit">°</span>';
+  el('dDist').textContent=Math.round(distance);
+  el('dispCount').textContent=receiveCount;
+  const now=performance.now();rateTimestamps=rateTimestamps.filter(t=>now-t<1000);
+  el('dispRate').innerHTML=rateTimestamps.length+'<span class="data-card-unit">Hz</span>';
+  addLog(raw,lineDetected?'warn':'');
+}
+
+// === Log ===
+const logEl=document.getElementById('rawLog');let logLines=0;
+function addLog(t,type=''){const l=document.createElement('div');l.className='log-line'+(type?' '+type:'');const ts=new Date().toLocaleTimeString('ja-JP',{hour12:false});l.textContent=`[${ts}] ${t}`;logEl.appendChild(l);logLines++;if(logLines>80){logEl.removeChild(logEl.firstChild);logLines--;}logEl.scrollTop=logEl.scrollHeight;}
+
+function togglePanel(b){b.classList.toggle('collapsed');b.closest('.panel').querySelector('.panel-body').classList.toggle('collapsed');}
+
+// === Serial ===
+async function connectSerial(){
+  if(!('serial' in navigator)){addLog('Web Serial API 非対応','error');return;}
+  try{serialPort=await navigator.serial.requestPort();const baud=parseInt(document.getElementById('baudRate').value);await serialPort.open({baudRate:baud});isConnected=true;updateUI();addLog(`接続 (${baud} bps)`,'info');readSerial();}catch(e){addLog('接続エラー: '+e.message,'error');}
+}
+async function readSerial(){
+  const dec=new TextDecoderStream();serialReadable=serialPort.readable.pipeTo(dec.writable);const r=dec.readable.getReader();serialReader=r;let buf='';
+  try{while(true){const{value,done}=await r.read();if(done)break;buf+=value;const ls=buf.split('\n');buf=ls.pop();for(const l of ls)if(l.trim())handleData(l);}}catch(e){if(isConnected)addLog('読取エラー: '+e.message,'error');}finally{r.releaseLock();}
+}
+async function disconnectSerial(){isConnected=false;try{if(serialReader){await serialReader.cancel();serialReader=null;}if(serialReadable){await serialReadable.catch(()=>{});serialReadable=null;}if(serialPort){await serialPort.close();serialPort=null;}}catch(e){}updateUI();addLog('切断','info');}
+function updateUI(){
+  const d=document.getElementById('statusDot'),t=document.getElementById('statusText'),bc=document.getElementById('btnConnect'),bd=document.getElementById('btnDisconnect');
+  if(isConnected){d.className='status-dot connected';t.textContent='接続中';bc.style.display='none';bd.style.display='';}
+  else if(isMocking){d.className='status-dot mock';t.textContent='モック動作中';bc.style.display='';bd.style.display='none';}
+  else{d.className='status-dot';t.textContent='未接続';bc.style.display='';bd.style.display='none';}
+}
+
+// === Mock ===
+let mockTick=0;
+function toggleMock(){isMocking?stopMock():startMock();}
+function startMock(){
+  if(isConnected){addLog('接続中はモック不可','warn');return;}
+  isMocking=true;mockTick=0;document.getElementById('btnMock').textContent='⏹ モック停止';document.getElementById('btnMock').className='btn btn-danger';updateUI();addLog('モック開始','info');
+  mockInterval=setInterval(()=>{
+    mockTick++;
+    const det=mockTick%150<120?1:0;
+    const dir=(mockTick*2.5)%360;
+    const esc=(dir+180)%360;
+    const chg=20+Math.sin(mockTick/20)*30;
+    const dist=800+Math.sin(mockTick/15)*400;
+    let bits=0;const sc=cfg.sensorCount;const dirRad=dir*Math.PI/180;
+    for(let i=0;i<sc;i++){const a=(i/sc)*Math.PI*2-Math.PI/2;const diff=Math.abs(Math.atan2(Math.sin(a-dirRad+Math.PI/2),Math.cos(a-dirRad+Math.PI/2)));if(diff<Math.PI/3)bits|=(1<<i);}
+    if(!det)bits=0;
+    const line=[det,dir.toFixed(1),esc.toFixed(1),chg.toFixed(1),Math.round(dist),'0x'+bits.toString(16).toUpperCase()].join(cfg.delimiter);
+    handleData(line);
+  },40);
+}
+function stopMock(){isMocking=false;clearInterval(mockInterval);mockInterval=null;document.getElementById('btnMock').textContent='🧪 モック開始';document.getElementById('btnMock').className='btn btn-mock';updateUI();addLog('モック停止','info');}
+
+// === Canvas Drawing ===
+const canvas=document.getElementById('lineCanvas'),ctx=canvas.getContext('2d');
+const CW=520,CH=520,CX=260,CY=260,R=200,RING_W=28;
+let frameCount=0,lastFpsTime=performance.now(),fps=0,animTime=0;
+
+function degToRad(d){return d*Math.PI/180;}
+function canvasAngle(d){return degToRad(d)-Math.PI/2;}
+
+function draw(ts){
+  animTime=ts||0;ctx.clearRect(0,0,CW,CH);
+  // BG
+  const bg=ctx.createRadialGradient(CX,CY,0,CX,CY,R+40);bg.addColorStop(0,'rgba(10,10,30,0.9)');bg.addColorStop(1,'rgba(6,6,15,1)');ctx.fillStyle=bg;ctx.beginPath();ctx.arc(CX,CY,R+40,0,Math.PI*2);ctx.fill();
+  // Ring track
+  ctx.beginPath();ctx.arc(CX,CY,R,0,Math.PI*2);ctx.strokeStyle='rgba(136,136,170,0.15)';ctx.lineWidth=RING_W;ctx.stroke();
+  // Sensor segments
+  const sc=cfg.sensorCount,segAngle=Math.PI*2/sc,gap=0.03;
+  for(let i=0;i<sc;i++){
+    const a=-Math.PI/2+i*segAngle+gap/2;const active=(sensorBits>>i)&1;
+    ctx.beginPath();ctx.arc(CX,CY,R,a,a+segAngle-gap);
+    ctx.strokeStyle=active?(lineDetected?'rgba(255,160,40,0.9)':'rgba(255,160,40,0.3)'):'rgba(60,60,100,0.3)';
+    ctx.lineWidth=RING_W-4;ctx.lineCap='butt';ctx.stroke();
+    if(active&&lineDetected){ctx.beginPath();ctx.arc(CX,CY,R,a,a+segAngle-gap);ctx.strokeStyle='rgba(255,160,40,0.15)';ctx.lineWidth=RING_W+10;ctx.stroke();}
+  }
+  // Ring outer/inner border
+  ctx.beginPath();ctx.arc(CX,CY,R+RING_W/2,0,Math.PI*2);ctx.strokeStyle='rgba(136,136,170,0.1)';ctx.lineWidth=1;ctx.stroke();
+  ctx.beginPath();ctx.arc(CX,CY,R-RING_W/2,0,Math.PI*2);ctx.strokeStyle='rgba(136,136,170,0.1)';ctx.lineWidth=1;ctx.stroke();
+  // Center robot
+  ctx.beginPath();ctx.arc(CX,CY,6,0,Math.PI*2);ctx.fillStyle='rgba(0,255,136,0.8)';ctx.fill();
+  // Forward triangle
+  const fwd=-Math.PI/2;ctx.beginPath();ctx.moveTo(CX+Math.cos(fwd)*22,CY+Math.sin(fwd)*22);ctx.lineTo(CX+Math.cos(fwd+2.5)*12,CY+Math.sin(fwd+2.5)*12);ctx.lineTo(CX+Math.cos(fwd-2.5)*12,CY+Math.sin(fwd-2.5)*12);ctx.closePath();ctx.fillStyle='rgba(0,255,136,0.5)';ctx.fill();
+
+  if(lineDetected&&(isConnected||isMocking)){
+    // White line across ring
+    const la=canvasAngle(lineDir),perpLen=R+10;
+    const perp=la+Math.PI/2;
+    ctx.beginPath();ctx.moveTo(CX+Math.cos(perp)*perpLen,CY+Math.sin(perp)*perpLen);ctx.lineTo(CX-Math.cos(perp)*perpLen,CY-Math.sin(perp)*perpLen);
+    ctx.strokeStyle='rgba(255,255,255,0.5)';ctx.lineWidth=2;ctx.setLineDash([]);ctx.stroke();
+    // Line direction arrow (orange solid)
+    const arrowLen=R-10;const ax=CX+Math.cos(la)*arrowLen,ay=CY+Math.sin(la)*arrowLen;
+    ctx.beginPath();ctx.moveTo(CX,CY);ctx.lineTo(ax,ay);ctx.strokeStyle='#ff8844';ctx.lineWidth=3;ctx.stroke();
+    // Arrowhead
+    const ah=15,aa=0.4;ctx.beginPath();ctx.moveTo(ax,ay);ctx.lineTo(ax-ah*Math.cos(la-aa),ay-ah*Math.sin(la-aa));ctx.lineTo(ax-ah*Math.cos(la+aa),ay-ah*Math.sin(la+aa));ctx.closePath();ctx.fillStyle='#ff8844';ctx.fill();
+    // Escape direction arrow (green dashed)
+    const ea=canvasAngle(escapeDir),elen=R-10;const ex=CX+Math.cos(ea)*elen,ey=CY+Math.sin(ea)*elen;
+    ctx.beginPath();ctx.moveTo(CX,CY);ctx.lineTo(ex,ey);ctx.strokeStyle='#00ff88';ctx.lineWidth=2.5;ctx.setLineDash([8,6]);ctx.stroke();ctx.setLineDash([]);
+    // Escape arrowhead
+    ctx.beginPath();ctx.moveTo(ex,ey);ctx.lineTo(ex-12*Math.cos(ea-0.4),ey-12*Math.sin(ea-0.4));ctx.lineTo(ex-12*Math.cos(ea+0.4),ey-12*Math.sin(ea+0.4));ctx.closePath();ctx.fillStyle='#00ff88';ctx.fill();
+  }
+  // No-line overlay
+  document.getElementById('noLineOverlay').classList.toggle('visible',!lineDetected&&(isConnected||isMocking));
+  // FPS
+  frameCount++;const now=performance.now();if(now-lastFpsTime>=500){fps=Math.round(frameCount/((now-lastFpsTime)/1000));frameCount=0;lastFpsTime=now;document.getElementById('fpsBadge').textContent=fps+' FPS';}
+  requestAnimationFrame(draw);
+}
+
+// === Responsive ===
+function resizeCanvas(){const c=document.getElementById('radarContainer');const s=Math.min(c.clientWidth-60,c.clientHeight-60,520);if(s>0){canvas.style.width=s+'px';canvas.style.height=s+'px';}}
+window.addEventListener('resize',resizeCanvas);setTimeout(resizeCanvas,100);
+
+// === Init ===
+if(!('serial' in navigator))document.getElementById('noSerialBanner').classList.add('visible');
+requestAnimationFrame(draw);
+addLog('Line Sensor Visualizer を起動しました','info');
+</script>
+</body>
+</html>
