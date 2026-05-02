@@ -65,6 +65,15 @@
           <div class="form-group"><label class="form-label">距離</label><input class="form-input" id="cfgDistIdx" type="number" value="4" min="0"></div>
           <div class="form-group"><label class="form-label">センサービット</label><input class="form-input" id="cfgBitsIdx" type="number" value="5" min="0"><div class="form-hint">16進数 or 10進数</div></div>
         </div>
+        <div style="border-top:1px solid var(--border);margin:12px 0;padding-top:12px">
+          <div class="form-group"><label class="trail-toggle"><input type="checkbox" id="cfgSubEnabled" checked> サブラインセンサーを使用</label></div>
+          <div id="subSettings">
+            <div class="form-group"><label class="form-label">サブセンサー個数</label>
+              <select class="form-select" id="cfgSubCount"><option value="8">8</option><option value="12">12</option><option value="16" selected>16</option><option value="20">20</option><option value="24">24</option><option value="32">32</option></select>
+            </div>
+            <div class="form-group"><label class="form-label">サブセンサービット</label><input class="form-input" id="cfgSubBitsIdx" type="number" value="6" min="0"><div class="form-hint">フィールド番号(0始まり)</div></div>
+          </div>
+        </div>
         <button class="btn btn-secondary" onclick="applyConfig()" style="margin-top:6px">✓ 適用</button>
       </div>
     </div>
@@ -110,9 +119,9 @@
 <script>
 // === State ===
 let serialPort=null,serialReader=null,serialReadable=null,isConnected=false,isMocking=false,mockInterval=null;
-let lineDetected=false,lineDir=0,escapeDir=0,angleChange=0,distance=0,sensorBits=0;
+let lineDetected=false,lineDir=0,escapeDir=0,angleChange=0,distance=0,sensorBits=0,subSensorBits=0;
 let receiveCount=0,rateTimestamps=[];
-let cfg={delimiter:',',sensorCount:16,detIdx:0,dirIdx:1,escIdx:2,chgIdx:3,distIdx:4,bitsIdx:5};
+let cfg={delimiter:',',sensorCount:16,detIdx:0,dirIdx:1,escIdx:2,chgIdx:3,distIdx:4,bitsIdx:5,subEnabled:true,subCount:16,subBitsIdx:6};
 
 function applyConfig(){
   const d=document.getElementById('cfgDelimiter').value;
@@ -124,24 +133,27 @@ function applyConfig(){
   cfg.chgIdx=parseInt(document.getElementById('cfgChgIdx').value)||0;
   cfg.distIdx=parseInt(document.getElementById('cfgDistIdx').value)||0;
   cfg.bitsIdx=parseInt(document.getElementById('cfgBitsIdx').value)||0;
+  cfg.subEnabled=document.getElementById('cfgSubEnabled').checked;
+  cfg.subCount=parseInt(document.getElementById('cfgSubCount').value)||16;
+  cfg.subBitsIdx=parseInt(document.getElementById('cfgSubBitsIdx').value)||0;
+  document.getElementById('subSettings').style.display=cfg.subEnabled?'':'none';
   addLog('設定を適用しました','info');
 }
 
+function parseHexOrDec(s){s=(s||'0').trim();if(s.startsWith('0x')||s.startsWith('0X'))return parseInt(s,16)||0;return parseInt(s)||0;}
 function parseLine(raw){
   raw=raw.trim();if(!raw)return null;
   const p=raw.split(cfg.delimiter);
   const g=i=>{const v=p[i];if(v===undefined)return 0;const n=parseFloat(v.trim());return isNaN(n)?0:n;};
-  const bits=p[cfg.bitsIdx]?p[cfg.bitsIdx].trim():'0';
-  let bv=0;
-  if(bits.startsWith('0x')||bits.startsWith('0X'))bv=parseInt(bits,16);
-  else bv=parseInt(bits)||0;
-  return{detected:g(cfg.detIdx)>=1,dir:g(cfg.dirIdx),esc:g(cfg.escIdx),chg:g(cfg.chgIdx),dist:g(cfg.distIdx),bits:bv};
+  const bv=parseHexOrDec(p[cfg.bitsIdx]);
+  const sbv=cfg.subEnabled?parseHexOrDec(p[cfg.subBitsIdx]):0;
+  return{detected:g(cfg.detIdx)>=1,dir:g(cfg.dirIdx),esc:g(cfg.escIdx),chg:g(cfg.chgIdx),dist:g(cfg.distIdx),bits:bv,subBits:sbv};
 }
 
 function handleData(raw){
   const d=parseLine(raw);if(!d){addLog(raw,'warn');return;}
   receiveCount++;rateTimestamps.push(performance.now());
-  lineDetected=d.detected;lineDir=d.dir;escapeDir=d.esc;angleChange=d.chg;distance=d.dist;sensorBits=d.bits;
+  lineDetected=d.detected;lineDir=d.dir;escapeDir=d.esc;angleChange=d.chg;distance=d.dist;sensorBits=d.bits;subSensorBits=d.subBits;
   const el=id=>document.getElementById(id);
   el('dLineDetected').textContent=lineDetected?'あり':'なし';
   el('dLineDetected').style.color=lineDetected?'var(--accent-orange)':'var(--accent-green)';
@@ -193,16 +205,18 @@ function startMock(){
     const dist=800+Math.sin(mockTick/15)*400;
     let bits=0;const sc=cfg.sensorCount;const dirRad=dir*Math.PI/180;
     for(let i=0;i<sc;i++){const a=(i/sc)*Math.PI*2-Math.PI/2;const diff=Math.abs(Math.atan2(Math.sin(a-dirRad+Math.PI/2),Math.cos(a-dirRad+Math.PI/2)));if(diff<Math.PI/3)bits|=(1<<i);}
-    if(!det)bits=0;
-    const line=[det,dir.toFixed(1),esc.toFixed(1),chg.toFixed(1),Math.round(dist),'0x'+bits.toString(16).toUpperCase()].join(cfg.delimiter);
-    handleData(line);
+    let sbits=0;if(cfg.subEnabled){const ssc=cfg.subCount;for(let i=0;i<ssc;i++){const a=(i/ssc)*Math.PI*2-Math.PI/2;const diff=Math.abs(Math.atan2(Math.sin(a-dirRad+Math.PI/2),Math.cos(a-dirRad+Math.PI/2)));if(diff<Math.PI/4)sbits|=(1<<i);}}
+    if(!det){bits=0;sbits=0;}
+    const fields=[det,dir.toFixed(1),esc.toFixed(1),chg.toFixed(1),Math.round(dist),'0x'+bits.toString(16).toUpperCase()];
+    if(cfg.subEnabled)fields.push('0x'+sbits.toString(16).toUpperCase());
+    handleData(fields.join(cfg.delimiter));
   },40);
 }
 function stopMock(){isMocking=false;clearInterval(mockInterval);mockInterval=null;document.getElementById('btnMock').textContent='🧪 モック開始';document.getElementById('btnMock').className='btn btn-mock';updateUI();addLog('モック停止','info');}
 
 // === Canvas Drawing ===
 const canvas=document.getElementById('lineCanvas'),ctx=canvas.getContext('2d');
-const CW=520,CH=520,CX=260,CY=260,R=200,RING_W=28;
+const CW=520,CH=520,CX=260,CY=260,R=200,RING_W=28,SUB_R=155,SUB_W=20;
 let frameCount=0,lastFpsTime=performance.now(),fps=0,animTime=0;
 
 function degToRad(d){return d*Math.PI/180;}
@@ -226,6 +240,20 @@ function draw(ts){
   // Ring outer/inner border
   ctx.beginPath();ctx.arc(CX,CY,R+RING_W/2,0,Math.PI*2);ctx.strokeStyle='rgba(136,136,170,0.1)';ctx.lineWidth=1;ctx.stroke();
   ctx.beginPath();ctx.arc(CX,CY,R-RING_W/2,0,Math.PI*2);ctx.strokeStyle='rgba(136,136,170,0.1)';ctx.lineWidth=1;ctx.stroke();
+  // Sub sensor ring
+  if(cfg.subEnabled){
+    ctx.beginPath();ctx.arc(CX,CY,SUB_R,0,Math.PI*2);ctx.strokeStyle='rgba(136,136,170,0.1)';ctx.lineWidth=SUB_W;ctx.stroke();
+    const ssc=cfg.subCount,sseg=Math.PI*2/ssc,sgap=0.04;
+    for(let i=0;i<ssc;i++){
+      const a=-Math.PI/2+i*sseg+sgap/2;const active=(subSensorBits>>i)&1;
+      ctx.beginPath();ctx.arc(CX,CY,SUB_R,a,a+sseg-sgap);
+      ctx.strokeStyle=active?(lineDetected?'rgba(100,180,255,0.85)':'rgba(100,180,255,0.25)'):'rgba(50,50,80,0.25)';
+      ctx.lineWidth=SUB_W-4;ctx.lineCap='butt';ctx.stroke();
+      if(active&&lineDetected){ctx.beginPath();ctx.arc(CX,CY,SUB_R,a,a+sseg-sgap);ctx.strokeStyle='rgba(100,180,255,0.1)';ctx.lineWidth=SUB_W+8;ctx.stroke();}
+    }
+    ctx.beginPath();ctx.arc(CX,CY,SUB_R+SUB_W/2,0,Math.PI*2);ctx.strokeStyle='rgba(136,136,170,0.08)';ctx.lineWidth=1;ctx.stroke();
+    ctx.beginPath();ctx.arc(CX,CY,SUB_R-SUB_W/2,0,Math.PI*2);ctx.strokeStyle='rgba(136,136,170,0.08)';ctx.lineWidth=1;ctx.stroke();
+  }
   // Center robot
   ctx.beginPath();ctx.arc(CX,CY,6,0,Math.PI*2);ctx.fillStyle='rgba(0,255,136,0.8)';ctx.fill();
   // Forward triangle
