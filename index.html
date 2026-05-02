@@ -1156,9 +1156,9 @@
 
       // Background circle
       const bgGrad = ctx.createRadialGradient(CX, CY, 0, CX, CY, RADAR_R + 20);
-      bgGrad.addColorStop(0, 'rgba(10, 10, 30, 0.9)');
-      bgGrad.addColorStop(0.8, 'rgba(6, 8, 20, 0.95)');
-      bgGrad.addColorStop(1, 'rgba(6, 6, 15, 1)');
+      bgGrad.addColorStop(0, 'rgba(255, 255, 255, 0.9)');
+      bgGrad.addColorStop(0.8, 'rgba(245, 248, 252, 0.95)');
+      bgGrad.addColorStop(1, 'rgba(235, 240, 245, 1)');
       ctx.fillStyle = bgGrad;
       ctx.beginPath();
       ctx.arc(CX, CY, RADAR_R + 20, 0, Math.PI * 2);
@@ -1170,13 +1170,13 @@
         const r = (RADAR_R / rings) * i;
         ctx.beginPath();
         ctx.arc(CX, CY, r, 0, Math.PI * 2);
-        ctx.strokeStyle = i === rings ? 'rgba(0, 255, 136, 0.3)' : 'var(--radar-ring-stroke)';
+        ctx.strokeStyle = i === rings ? 'rgba(0, 184, 107, 0.4)' : 'rgba(0, 0, 0, 0.06)';
         ctx.lineWidth = i === rings ? 1.5 : 0.5;
         ctx.stroke();
 
         // Ring value labels
         const val = Math.round((cfg.maxIntensity / rings) * i);
-        ctx.fillStyle = 'rgba(136, 136, 170, 0.4)';
+        ctx.fillStyle = 'rgba(100, 110, 130, 0.6)';
         ctx.font = '10px Inter, sans-serif';
         ctx.textAlign = 'left';
         ctx.fillText(val, CX + 4, CY - r + 12);
@@ -1187,7 +1187,7 @@
         const r = (RADAR_R / rings) * i;
         ctx.beginPath();
         ctx.arc(CX, CY, r, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(0, 255, 136, ${0.01 + (i % 2 === 0 ? 0.01 : 0)})`;
+        ctx.fillStyle = `rgba(0, 184, 107, ${0.01 + (i % 2 === 0 ? 0.01 : 0)})`;
         ctx.fill();
       }
 
@@ -1199,7 +1199,7 @@
         ctx.beginPath();
         ctx.moveTo(CX, CY);
         ctx.lineTo(x2, y2);
-        ctx.strokeStyle = deg % 90 === 0 ? 'rgba(0, 255, 136, 0.15)' : 'rgba(0, 255, 136, 0.06)';
+        ctx.strokeStyle = deg % 90 === 0 ? 'rgba(0, 184, 107, 0.2)' : 'rgba(0, 0, 0, 0.04)';
         ctx.lineWidth = deg % 90 === 0 ? 1 : 0.5;
         ctx.stroke();
 
@@ -1207,7 +1207,7 @@
         const labelR = RADAR_R + 14;
         const lx = CX + Math.cos(rad) * labelR;
         const ly = CY + Math.sin(rad) * labelR;
-        ctx.fillStyle = deg % 90 === 0 ? 'rgba(136, 136, 170, 0.7)' : 'rgba(136, 136, 170, 0.35)';
+        ctx.fillStyle = deg % 90 === 0 ? 'rgba(80, 90, 110, 0.8)' : 'rgba(100, 110, 130, 0.5)';
         ctx.font = deg % 90 === 0 ? 'bold 11px Inter, sans-serif' : '9px Inter, sans-serif';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
@@ -1217,11 +1217,11 @@
       // Center robot marker
       ctx.beginPath();
       ctx.arc(CX, CY, 6, 0, Math.PI * 2);
-      ctx.fillStyle = 'rgba(0, 255, 136, 0.8)';
+      ctx.fillStyle = 'rgba(0, 184, 107, 0.8)';
       ctx.fill();
       ctx.beginPath();
       ctx.arc(CX, CY, 10, 0, Math.PI * 2);
-      ctx.strokeStyle = 'rgba(0, 255, 136, 0.3)';
+      ctx.strokeStyle = 'rgba(0, 184, 107, 0.4)';
       ctx.lineWidth = 1;
       ctx.stroke();
 
@@ -1236,17 +1236,17 @@
       ctx.lineTo(CX + Math.cos(fwdLeft) * 12, CY + Math.sin(fwdLeft) * 12);
       ctx.lineTo(CX + Math.cos(fwdRight) * 12, CY + Math.sin(fwdRight) * 12);
       ctx.closePath();
-      ctx.fillStyle = 'rgba(0, 255, 136, 0.5)';
+      ctx.fillStyle = 'rgba(0, 184, 107, 0.6)';
       ctx.fill();
 
       // Scanning sweep effect
       if (isConnected || isMocking) {
         const sweepAngle = (animTime / 2000) * Math.PI * 2;
         const sweepGrad = ctx.createConicGradient(sweepAngle - Math.PI / 6, CX, CY);
-        sweepGrad.addColorStop(0, 'rgba(0, 255, 136, 0)');
-        sweepGrad.addColorStop(0.08, 'rgba(0, 255, 136, 0.04)');
-        sweepGrad.addColorStop(0.1, 'rgba(0, 255, 136, 0)');
-        sweepGrad.addColorStop(1, 'rgba(0, 255, 136, 0)');
+        sweepGrad.addColorStop(0, 'rgba(0, 184, 107, 0)');
+        sweepGrad.addColorStop(0.08, 'rgba(0, 184, 107, 0.06)');
+        sweepGrad.addColorStop(0.1, 'rgba(0, 184, 107, 0)');
+        sweepGrad.addColorStop(1, 'rgba(0, 184, 107, 0)');
         ctx.beginPath();
         ctx.arc(CX, CY, RADAR_R, 0, Math.PI * 2);
         ctx.fillStyle = sweepGrad;
@@ -1334,7 +1334,7 @@
         ctx.setLineDash([]);
 
         // Angle & distance label near ball
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+        ctx.fillStyle = 'rgba(30, 40, 50, 0.8)';
         ctx.font = '500 11px Inter, sans-serif';
         ctx.textAlign = 'center';
         ctx.fillText(`${currentAngle.toFixed(1)}° / ${Math.round(currentIntensity)}`, bx, by - 20);

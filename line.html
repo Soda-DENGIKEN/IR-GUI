@@ -250,21 +250,21 @@ function canvasAngle(d){return degToRad(d)-Math.PI/2;}
 function draw(ts){
   animTime=ts||0;ctx.clearRect(0,0,CW,CH);
   // BG
-  const bg=ctx.createRadialGradient(CX,CY,0,CX,CY,R+40);bg.addColorStop(0,'rgba(10,10,30,0.9)');bg.addColorStop(1,'rgba(6,6,15,1)');ctx.fillStyle=bg;ctx.beginPath();ctx.arc(CX,CY,R+40,0,Math.PI*2);ctx.fill();
+  const bg=ctx.createRadialGradient(CX,CY,0,CX,CY,R+40);bg.addColorStop(0,'rgba(255,255,255,0.9)');bg.addColorStop(1,'rgba(235,240,245,1)');ctx.fillStyle=bg;ctx.beginPath();ctx.arc(CX,CY,R+40,0,Math.PI*2);ctx.fill();
   // Ring track
-  ctx.beginPath();ctx.arc(CX,CY,R,0,Math.PI*2);ctx.strokeStyle='rgba(136,136,170,0.15)';ctx.lineWidth=RING_W;ctx.stroke();
+  ctx.beginPath();ctx.arc(CX,CY,R,0,Math.PI*2);ctx.strokeStyle='rgba(0,0,0,0.06)';ctx.lineWidth=RING_W;ctx.stroke();
   // Sensor segments
   const sc=cfg.sensorCount,segAngle=Math.PI*2/sc,gap=0.03;
   for(let i=0;i<sc;i++){
     const a=-Math.PI/2+i*segAngle+gap/2;const active=(sensorBits>>i)&1;
     ctx.beginPath();ctx.arc(CX,CY,R,a,a+segAngle-gap);
-    ctx.strokeStyle=active?(lineDetected?'rgba(255,160,40,0.9)':'rgba(255,160,40,0.3)'):'rgba(60,60,100,0.3)';
+    ctx.strokeStyle=active?(lineDetected?'rgba(240,106,37,0.9)':'rgba(240,106,37,0.3)'):'rgba(200,210,220,0.5)';
     ctx.lineWidth=RING_W-4;ctx.lineCap='butt';ctx.stroke();
-    if(active&&lineDetected){ctx.beginPath();ctx.arc(CX,CY,R,a,a+segAngle-gap);ctx.strokeStyle='rgba(255,160,40,0.15)';ctx.lineWidth=RING_W+10;ctx.stroke();}
+    if(active&&lineDetected){ctx.beginPath();ctx.arc(CX,CY,R,a,a+segAngle-gap);ctx.strokeStyle='rgba(240,106,37,0.15)';ctx.lineWidth=RING_W+10;ctx.stroke();}
   }
   // Ring outer/inner border
-  ctx.beginPath();ctx.arc(CX,CY,R+RING_W/2,0,Math.PI*2);ctx.strokeStyle='rgba(136,136,170,0.1)';ctx.lineWidth=1;ctx.stroke();
-  ctx.beginPath();ctx.arc(CX,CY,R-RING_W/2,0,Math.PI*2);ctx.strokeStyle='rgba(136,136,170,0.1)';ctx.lineWidth=1;ctx.stroke();
+  ctx.beginPath();ctx.arc(CX,CY,R+RING_W/2,0,Math.PI*2);ctx.strokeStyle='rgba(0,0,0,0.08)';ctx.lineWidth=1;ctx.stroke();
+  ctx.beginPath();ctx.arc(CX,CY,R-RING_W/2,0,Math.PI*2);ctx.strokeStyle='rgba(0,0,0,0.08)';ctx.lineWidth=1;ctx.stroke();
   // Sub sensor arms (outside main ring)
   if(cfg.subEnabled){
     const armDirs=[];if(cfg.subArms.f)armDirs.push({deg:0,label:'F'});if(cfg.subArms.r)armDirs.push({deg:90,label:'R'});if(cfg.subArms.b)armDirs.push({deg:180,label:'B'});if(cfg.subArms.l)armDirs.push({deg:270,label:'L'});
@@ -273,40 +273,40 @@ function draw(ts){
     armDirs.forEach(arm=>{
       const cA=degToRad(arm.deg)-Math.PI/2;
       const segSp=armSpan/perArm,segGap=0.02;
-      ctx.beginPath();ctx.arc(CX,CY,armR,cA-armSpan/2,cA+armSpan/2);ctx.strokeStyle='rgba(80,80,120,0.2)';ctx.lineWidth=armW;ctx.lineCap='butt';ctx.stroke();
+      ctx.beginPath();ctx.arc(CX,CY,armR,cA-armSpan/2,cA+armSpan/2);ctx.strokeStyle='rgba(0,0,0,0.06)';ctx.lineWidth=armW;ctx.lineCap='butt';ctx.stroke();
       for(let j=0;j<perArm;j++){
         const sa=cA-armSpan/2+j*segSp+segGap/2;
         const active=(subSensorBits>>bi)&1;bi++;
         ctx.beginPath();ctx.arc(CX,CY,armR,sa,sa+segSp-segGap);
-        ctx.strokeStyle=active?(lineDetected?'rgba(100,180,255,0.9)':'rgba(100,180,255,0.3)'):'rgba(50,50,80,0.3)';
+        ctx.strokeStyle=active?(lineDetected?'rgba(45,112,245,0.9)':'rgba(45,112,245,0.3)'):'rgba(200,210,220,0.5)';
         ctx.lineWidth=armW-4;ctx.lineCap='butt';ctx.stroke();
-        if(active&&lineDetected){ctx.beginPath();ctx.arc(CX,CY,armR,sa,sa+segSp-segGap);ctx.strokeStyle='rgba(100,180,255,0.12)';ctx.lineWidth=armW+8;ctx.stroke();}
+        if(active&&lineDetected){ctx.beginPath();ctx.arc(CX,CY,armR,sa,sa+segSp-segGap);ctx.strokeStyle='rgba(45,112,245,0.15)';ctx.lineWidth=armW+8;ctx.stroke();}
       }
       const lx=CX+Math.cos(cA)*(armR+16),ly=CY+Math.sin(cA)*(armR+16);
-      ctx.fillStyle='rgba(100,180,255,0.5)';ctx.font='bold 10px Inter,sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(arm.label,lx,ly);
+      ctx.fillStyle='rgba(45,112,245,0.8)';ctx.font='bold 10px Inter,sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(arm.label,lx,ly);
     });
   }
   // Center robot
-  ctx.beginPath();ctx.arc(CX,CY,6,0,Math.PI*2);ctx.fillStyle='rgba(0,255,136,0.8)';ctx.fill();
+  ctx.beginPath();ctx.arc(CX,CY,6,0,Math.PI*2);ctx.fillStyle='rgba(0,184,107,0.8)';ctx.fill();
   // Forward triangle
-  const fwd=-Math.PI/2;ctx.beginPath();ctx.moveTo(CX+Math.cos(fwd)*22,CY+Math.sin(fwd)*22);ctx.lineTo(CX+Math.cos(fwd+2.5)*12,CY+Math.sin(fwd+2.5)*12);ctx.lineTo(CX+Math.cos(fwd-2.5)*12,CY+Math.sin(fwd-2.5)*12);ctx.closePath();ctx.fillStyle='rgba(0,255,136,0.5)';ctx.fill();
+  const fwd=-Math.PI/2;ctx.beginPath();ctx.moveTo(CX+Math.cos(fwd)*22,CY+Math.sin(fwd)*22);ctx.lineTo(CX+Math.cos(fwd+2.5)*12,CY+Math.sin(fwd+2.5)*12);ctx.lineTo(CX+Math.cos(fwd-2.5)*12,CY+Math.sin(fwd-2.5)*12);ctx.closePath();ctx.fillStyle='rgba(0,184,107,0.6)';ctx.fill();
 
   if(lineDetected&&(isConnected||isMocking)){
     // White line across ring
     const la=canvasAngle(lineDir),perpLen=R+10;
     const perp=la+Math.PI/2;
     ctx.beginPath();ctx.moveTo(CX+Math.cos(perp)*perpLen,CY+Math.sin(perp)*perpLen);ctx.lineTo(CX-Math.cos(perp)*perpLen,CY-Math.sin(perp)*perpLen);
-    ctx.strokeStyle='rgba(255,255,255,0.5)';ctx.lineWidth=2;ctx.setLineDash([]);ctx.stroke();
+    ctx.strokeStyle='rgba(0,0,0,0.3)';ctx.lineWidth=2;ctx.setLineDash([]);ctx.stroke();
     // Line direction arrow (orange solid)
     const arrowLen=R-10;const ax=CX+Math.cos(la)*arrowLen,ay=CY+Math.sin(la)*arrowLen;
-    ctx.beginPath();ctx.moveTo(CX,CY);ctx.lineTo(ax,ay);ctx.strokeStyle='#ff8844';ctx.lineWidth=3;ctx.stroke();
+    ctx.beginPath();ctx.moveTo(CX,CY);ctx.lineTo(ax,ay);ctx.strokeStyle='#f06a25';ctx.lineWidth=3;ctx.stroke();
     // Arrowhead
-    const ah=15,aa=0.4;ctx.beginPath();ctx.moveTo(ax,ay);ctx.lineTo(ax-ah*Math.cos(la-aa),ay-ah*Math.sin(la-aa));ctx.lineTo(ax-ah*Math.cos(la+aa),ay-ah*Math.sin(la+aa));ctx.closePath();ctx.fillStyle='#ff8844';ctx.fill();
+    const ah=15,aa=0.4;ctx.beginPath();ctx.moveTo(ax,ay);ctx.lineTo(ax-ah*Math.cos(la-aa),ay-ah*Math.sin(la-aa));ctx.lineTo(ax-ah*Math.cos(la+aa),ay-ah*Math.sin(la+aa));ctx.closePath();ctx.fillStyle='#f06a25';ctx.fill();
     // Escape direction arrow (green dashed)
     const ea=canvasAngle(escapeDir),elen=R-10;const ex=CX+Math.cos(ea)*elen,ey=CY+Math.sin(ea)*elen;
-    ctx.beginPath();ctx.moveTo(CX,CY);ctx.lineTo(ex,ey);ctx.strokeStyle='#00ff88';ctx.lineWidth=2.5;ctx.setLineDash([8,6]);ctx.stroke();ctx.setLineDash([]);
+    ctx.beginPath();ctx.moveTo(CX,CY);ctx.lineTo(ex,ey);ctx.strokeStyle='#00b86b';ctx.lineWidth=2.5;ctx.setLineDash([8,6]);ctx.stroke();ctx.setLineDash([]);
     // Escape arrowhead
-    ctx.beginPath();ctx.moveTo(ex,ey);ctx.lineTo(ex-12*Math.cos(ea-0.4),ey-12*Math.sin(ea-0.4));ctx.lineTo(ex-12*Math.cos(ea+0.4),ey-12*Math.sin(ea+0.4));ctx.closePath();ctx.fillStyle='#00ff88';ctx.fill();
+    ctx.beginPath();ctx.moveTo(ex,ey);ctx.lineTo(ex-12*Math.cos(ea-0.4),ey-12*Math.sin(ea-0.4));ctx.lineTo(ex-12*Math.cos(ea+0.4),ey-12*Math.sin(ea+0.4));ctx.closePath();ctx.fillStyle='#00b86b';ctx.fill();
   }
   // No-line overlay
   document.getElementById('noLineOverlay').classList.toggle('visible',!lineDetected&&(isConnected||isMocking));
