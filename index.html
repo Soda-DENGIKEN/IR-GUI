@@ -637,7 +637,8 @@
         ctx.stroke();
 
         // Ring value labels
-        const val = Math.round((cfg.maxIntensity / rings) * i);
+        // 強度が強いほど中心に近いため、目盛りの数値も内側ほど大きくなるように反転させます
+        const val = Math.round(cfg.maxIntensity * (1 - (i / rings)));
         ctx.fillStyle = 'rgba(100, 110, 130, 0.6)';
         ctx.font = '10px Inter, sans-serif';
         ctx.textAlign = 'left';
