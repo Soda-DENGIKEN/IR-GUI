@@ -607,7 +607,9 @@
     }
 
     function intensityToRadius(intensity) {
-      return Math.min(Math.max(intensity / cfg.maxIntensity, 0), 1) * RADAR_R;
+      // 強度が強いほど光源（ボール）に近いため、比率を反転させて中心に近づけます
+      const ratio = Math.min(Math.max(intensity / cfg.maxIntensity, 0), 1);
+      return (1 - ratio) * RADAR_R;
     }
 
     function drawRadar(timestamp) {
